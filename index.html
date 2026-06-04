@@ -210,6 +210,27 @@ body{
   padding:4px 8px;flex-shrink:0;margin-top:4px;
   border-radius:0 3px 3px 0;
 }
+/* 写真直下のコメント */
+.p-comment-under{
+  font-size:7pt;white-space:pre-wrap;color:#444;
+  background:#fffde7;border:1px solid #f0e090;
+  border-top:none;padding:3px 8px;flex-shrink:0;
+  border-radius:0 0 4px 4px;line-height:1.5;
+}
+/* 写真追加ボタン */
+.upload-btn-group{
+  display:flex;gap:6px;margin-top:8px;
+}
+.upload-btn-group button{
+  flex:1;font-size:.78rem;padding:8px 4px;
+  border-radius:8px;font-weight:600;cursor:pointer;
+  border:1.5px solid;display:flex;align-items:center;
+  justify-content:center;gap:4px;
+}
+.btn-cam{background:#eaf5ef;border-color:var(--primary);color:var(--primary);}
+.btn-cam:hover{background:var(--primary);color:#fff;}
+.btn-lib{background:#f0f0f0;border-color:#999;color:#555;}
+.btn-lib:hover{background:#ddd;}
 /* 表紙・まとめ */
 .p-title{
   text-align:center;font-size:17pt;font-weight:bold;
@@ -541,12 +562,19 @@ body{
         <div class="field-row">
           <label class="form-label">写真（タップで追加）</label>
           <div class="photo-grid" id="edit-photo-grid"></div>
-          <div class="upload-zone mt-2" onclick="document.getElementById('edit-file-input').click()">
-            <i class="bi bi-camera-fill"></i>
-            写真を追加<br><small>カメラ撮影またはライブラリから選択</small>
+          <div class="upload-btn-group mt-2">
+            <button class="btn-cam" onclick="document.getElementById('edit-file-cam').click()">
+              <i class="bi bi-camera-fill"></i>カメラ撮影
+            </button>
+            <button class="btn-lib" onclick="document.getElementById('edit-file-lib').click()">
+              <i class="bi bi-images"></i>ライブラリ
+            </button>
           </div>
-          <input type="file" id="edit-file-input" multiple accept="image/*"
+          <input type="file" id="edit-file-cam" multiple accept="image/*"
                  capture="environment" style="display:none"
+                 onchange="handlePhotoUpload(this)">
+          <input type="file" id="edit-file-lib" multiple accept="image/*"
+                 style="display:none"
                  onchange="handlePhotoUpload(this)">
         </div>
       </div>
@@ -711,12 +739,19 @@ function renderSections() {
                 <button class="del-btn" onclick="deletePhoto('${sec.id}','${p.id}')">×</button>
               </div>`).join('')}
           </div>
-          <div class="upload-zone" onclick="triggerUpload('${sec.id}')">
-            <i class="bi bi-camera-fill"></i>
-            <span style="font-size:.82rem;">写真を追加（タップ）</span>
+          <div class="upload-btn-group">
+            <button class="btn-cam" onclick="document.getElementById('fu-cam-${sec.id}').click()">
+              <i class="bi bi-camera-fill"></i>カメラ撮影
+            </button>
+            <button class="btn-lib" onclick="document.getElementById('fu-lib-${sec.id}').click()">
+              <i class="bi bi-images"></i>ライブラリ
+            </button>
           </div>
-          <input type="file" id="fu-${sec.id}" multiple accept="image/*"
+          <input type="file" id="fu-cam-${sec.id}" multiple accept="image/*"
                  capture="environment" style="display:none"
+                 onchange="uploadToSection('${sec.id}',this)">
+          <input type="file" id="fu-lib-${sec.id}" multiple accept="image/*"
+                 style="display:none"
                  onchange="uploadToSection('${sec.id}',this)">
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
@@ -975,9 +1010,10 @@ function showPrint() {
     const aSec = g['作業後'] || g['作業前中後'] || null;
 
     if (bSec || aSec) {
-      const bPhoto = bSec && (bSec.photos||[])[0];
-      const aPhoto = aSec && (aSec.photos||[])[0];
-      const comment = (bSec && bSec.comment) || (aSec && aSec.comment) || '';
+      const bPhoto   = bSec && (bSec.photos||[])[0];
+      const aPhoto   = aSec && (aSec.photos||[])[0];
+      const bComment = (bSec && bSec.comment) || '';
+      const aComment = (aSec && aSec.comment) || '';
       html += `<div class="print-page">
         <div class="p-page-header">
           <span class="p-page-title">作　業　報　告　書</span>
@@ -987,13 +1023,14 @@ function showPrint() {
           <div class="p-photo-label before">作業前</div>
           <div class="p-location-bar">場所：${e(loc)}</div>
           ${bPhoto ? `<img class="p-photo-img" src="${bPhoto.url}" alt="作業前">` : '<div class="p-photo-empty">（写真なし）</div>'}
+          ${bComment ? `<div class="p-comment-under">＜コメント＞　${e(bComment)}</div>` : ''}
         </div>
         <div class="p-photo-block">
           <div class="p-photo-label after">作業後</div>
           <div class="p-location-bar">場所：${e(loc)}</div>
           ${aPhoto ? `<img class="p-photo-img" src="${aPhoto.url}" alt="作業後">` : '<div class="p-photo-empty">（写真なし）</div>'}
+          ${aComment ? `<div class="p-comment-under">＜コメント＞　${e(aComment)}</div>` : ''}
         </div>
-        ${comment ? `<div class="p-comment-strip">＜コメント＞　${e(comment)}</div>` : ''}
       </div>`;
     }
 
@@ -1010,8 +1047,8 @@ function showPrint() {
             <div class="p-photo-label ${type==='作業中'?'mid':'other'}">${e(type)}</div>
             <div class="p-location-bar">場所：${e(loc)}</div>
             ${photo ? `<img class="p-photo-img" src="${photo.url}" alt="${e(type)}">` : '<div class="p-photo-empty">（写真なし）</div>'}
+            ${sec.comment ? `<div class="p-comment-under">＜コメント＞　${e(sec.comment)}</div>` : ''}
           </div>
-          ${sec.comment ? `<div class="p-comment-strip">＜コメント＞　${e(sec.comment)}</div>` : ''}
         </div>`;
       });
   });
