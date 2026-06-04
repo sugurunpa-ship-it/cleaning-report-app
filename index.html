@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 /* ─── 変数 ─── */
 :root {
@@ -343,6 +343,27 @@ body{
           </select>
         </div>
       </div>
+      <!-- 建物全景写真 -->
+      <div class="field-row">
+        <label class="form-label">建物全景写真</label>
+        <div id="cover-photo-preview" style="display:none;position:relative;margin-bottom:8px;">
+          <img id="cover-photo-img" src="" alt="建物全景"
+               style="width:100%;max-height:220px;object-fit:cover;border-radius:9px;border:1.5px solid #cfe3d8;">
+          <button onclick="removeCoverPhoto()" type="button"
+                  style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:28px;height:28px;font-size:16px;cursor:pointer;">×</button>
+        </div>
+        <div class="upload-btn-group" id="cover-upload-btns">
+          <button class="btn-cam" type="button" onclick="document.getElementById('cover-file-cam').click()">
+            <i class="bi bi-camera-fill"></i>カメラ撮影
+          </button>
+          <button class="btn-lib" type="button" onclick="document.getElementById('cover-file-lib').click()">
+            <i class="bi bi-images"></i>ライブラリ
+          </button>
+        </div>
+        <input type="file" id="cover-file-cam" accept="image/*" capture="environment" style="display:none" onchange="setCoverPhoto(this)">
+        <input type="file" id="cover-file-lib" accept="image/*" style="display:none" onchange="setCoverPhoto(this)">
+      </div>
+
       <div class="field-row">
         <label class="form-label">建物名称 <span class="text-danger">*</span></label>
         <input type="text" class="form-control" id="f-building" placeholder="例：レスタンノール">
@@ -600,7 +621,7 @@ function loadData() {
   } catch(e) {}
   return {
     cover: {
-      client:'', honorific:'様', building:'',
+      client:'', honorific:'様', coverPhoto:'', building:'',
       date: new Date().toISOString().slice(0,10),
       period:'', workname:'', areas:'',
       company:'株式会社リンクス・エステート', author:'',
@@ -653,6 +674,14 @@ function fillCoverForm() {
   const c = data.cover;
   document.getElementById('f-client').value           = c.client || '';
   document.getElementById('f-honorific').value        = c.honorific || '様';
+  if (c.coverPhoto) {
+    document.getElementById('cover-photo-img').src = c.coverPhoto;
+    document.getElementById('cover-photo-preview').style.display = '';
+    document.getElementById('cover-upload-btns').style.display = 'none';
+  } else {
+    document.getElementById('cover-photo-preview').style.display = 'none';
+    document.getElementById('cover-upload-btns').style.display = '';
+  }
   document.getElementById('f-building').value         = c.building || '';
   document.getElementById('f-date').value             = c.date || '';
   document.getElementById('f-period').value           = c.period || '';
@@ -667,6 +696,7 @@ function fillCoverForm() {
 
 function saveCover() {
   data.cover.client       = document.getElementById('f-client').value.trim();
+  // coverPhotoはsetCoverPhoto/removeCoverPhotoで直接更新
   data.cover.honorific    = document.getElementById('f-honorific').value;
   data.cover.building     = document.getElementById('f-building').value.trim();
   data.cover.date         = document.getElementById('f-date').value;
@@ -680,6 +710,32 @@ function saveCover() {
   data.cover.sumAdvice    = document.getElementById('f-summary-advice').value.trim();
   saveData(data);
   showView('sections');
+}
+
+// 建物全景写真
+function setCoverPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  showSpinner(true);
+  const reader = new FileReader();
+  reader.onload = e => {
+    resizeImage(e.target.result, 1600, url => {
+      data.cover.coverPhoto = url;
+      saveData(data);
+      document.getElementById('cover-photo-img').src = url;
+      document.getElementById('cover-photo-preview').style.display = '';
+      document.getElementById('cover-upload-btns').style.display = 'none';
+      showSpinner(false);
+    });
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+function removeCoverPhoto() {
+  data.cover.coverPhoto = '';
+  saveData(data);
+  document.getElementById('cover-photo-preview').style.display = 'none';
+  document.getElementById('cover-upload-btns').style.display = '';
 }
 
 // =====================================================
@@ -898,80 +954,334 @@ function renderPreview() {
 }
 
 // =====================================================
-//  Excel 出力
+//  Excel 出力（ExcelJS：写真埋め込み対応）
 // =====================================================
-function exportExcel() {
+async function exportExcel() {
   showSpinner(true);
-  setTimeout(() => {
-    try {
-      const wb = XLSX.utils.book_new();
-      const c  = data.cover;
-      const hn = c.honorific || '様';
+  try {
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'cleaning-report-app';
+    const c  = data.cover;
+    const hn = c.honorific || '様';
 
-      // 表紙
-      const ws1 = XLSX.utils.aoa_to_sheet([
-        ['作　業　報　告　書'],
-        ['','','','','','','',c.company],
-        ['','','','','','','','（作成者）'+c.author],
-        [c.client + '　' + hn],
-        ['建物名称',c.building,'','','','完了報告日',c.date],
-        ['作業名称',c.workname,'','','','作業期間',c.period],
-        ['作業箇所',c.areas],
-        [],
-        ['〇清掃内容について'],[c.sumCleaning||''],
-        ['〇使用洗剤について'],[c.sumDetergent||''],
-        ['〇今後のメンテナンスアドバイスについて'],[c.sumAdvice||''],
-      ]);
-      ws1['!cols'] = [{wch:14},{wch:22},{wch:8},{wch:8},{wch:8},{wch:14},{wch:16}];
-      XLSX.utils.book_append_sheet(wb, ws1, '表紙');
+    // ── ヘルパー ──
+    const GREEN_DARK  = '2e7d52';
+    const GREEN_LIGHT = 'd6f0e2';
+    const GREEN_MID   = 'a8d5bc';
+    const YELLOW_BG   = 'fffde7';
 
-      // セクション別シート
-      const groups = {};
-      data.sections.forEach(sec => {
-        const k = sec.type||'作業中';
-        if (!groups[k]) groups[k] = [];
-        groups[k].push(sec);
-      });
-      Object.entries(groups).forEach(([type, secs]) => {
-        const rows = [['作　業　報　告　書'],['','','','','','','',c.company]];
-        secs.forEach(sec => {
-          rows.push([type + '　写真']);
-          rows.push(['作業場所', sec.location]);
-          rows.push(['コメント', sec.comment]);
-          rows.push(['写真枚数', (sec.photos||[]).length + '枚']);
-          rows.push([]);
-        });
-        const ws = XLSX.utils.aoa_to_sheet(rows);
-        ws['!cols'] = [{wch:14},{wch:30}];
-        XLSX.utils.book_append_sheet(wb, ws, type.slice(0,31));
-      });
-
-      // まとめ
-      const wsS = XLSX.utils.aoa_to_sheet([
-        ['作　業　報　告　書'],
-        ['','','','','','','',c.company],
-        ['','','','','','','','（作成者）'+c.author],
-        [c.client + '　' + hn],
-        ['建物名称',c.building,'','','','完了報告日',c.date],
-        ['工事名称',c.workname,'','','','工事期間',c.period],
-        ['作業箇所',c.areas],[],
-        ['この度は定期清掃を実施させて頂きまして、誠にありがとうございました。'],[],
-        ['〇清掃内容について'],[c.sumCleaning||''],
-        ['〇使用洗剤について'],[c.sumDetergent||''],
-        ['〇今後のメンテナンスのアドバイスについて'],[c.sumAdvice||''],
-      ]);
-      wsS['!cols'] = [{wch:14},{wch:22},{wch:8},{wch:8},{wch:8},{wch:14},{wch:16}];
-      XLSX.utils.book_append_sheet(wb, wsS, 'まとめ');
-
-      const building = c.building || '清掃';
-      const dateStr  = (c.date||'').replace(/-/g,'');
-      XLSX.writeFile(wb, `${dateStr}【清掃報告書】${building}.xlsx`);
-    } catch(e) {
-      alert('Excel出力に失敗しました：' + e.message);
-    } finally {
-      showSpinner(false);
+    function hdr(ws, text, rowNum) {
+      const r = ws.getRow(rowNum);
+      r.height = 36;
+      ws.mergeCells(rowNum, 1, rowNum, 10);
+      const cell = ws.getCell(rowNum, 1);
+      cell.value = text;
+      cell.font  = { name:'Meiryo', size:18, bold:true, color:{argb:'FF'+GREEN_DARK} };
+      cell.alignment = { horizontal:'center', vertical:'middle' };
+      cell.fill  = { type:'pattern', pattern:'solid', fgColor:{argb:'FFFFFFFF'} };
     }
-  }, 50);
+
+    function labelCell(ws, r, c2, txt) {
+      const cell = ws.getCell(r, c2);
+      cell.value = txt;
+      cell.font  = { name:'Meiryo', size:10, bold:true };
+      cell.fill  = { type:'pattern', pattern:'solid', fgColor:{argb:'FF'+GREEN_LIGHT} };
+      cell.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
+      cell.alignment = { vertical:'middle' };
+    }
+
+    function valueCell(ws, r, c2, txt, colspan) {
+      ws.mergeCells(r, c2, r, c2 + colspan - 1);
+      const cell = ws.getCell(r, c2);
+      cell.value = txt || '';
+      cell.font  = { name:'Meiryo', size:10 };
+      cell.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
+      cell.alignment = { vertical:'middle', wrapText:true };
+    }
+
+    function sectionLabel(ws, r, txt, color) {
+      ws.mergeCells(r, 1, r, 10);
+      const cell = ws.getCell(r, 1);
+      cell.value = txt;
+      cell.font  = { name:'Meiryo', size:11, bold:true, color:{argb:'FFFFFFFF'} };
+      cell.fill  = { type:'pattern', pattern:'solid', fgColor:{argb:'FF'+color} };
+      cell.alignment = { vertical:'middle', indent:1 };
+      ws.getRow(r).height = 22;
+    }
+
+    function locationRow(ws, r, loc) {
+      ws.mergeCells(r, 1, r, 10);
+      const cell = ws.getCell(r, 1);
+      cell.value = '場所：' + (loc||'');
+      cell.font  = { name:'Meiryo', size:10, bold:true, color:{argb:'FF'+GREEN_DARK} };
+      cell.fill  = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF0FAF5'} };
+      cell.border = { bottom:{style:'thin',color:{argb:'FF'+GREEN_MID}} };
+      ws.getRow(r).height = 18;
+    }
+
+    function commentRow(ws, r, txt) {
+      if (!txt) return;
+      ws.mergeCells(r, 1, r, 10);
+      const cell = ws.getCell(r, 1);
+      cell.value = '＜コメント＞　' + txt;
+      cell.font  = { name:'Meiryo', size:9 };
+      cell.fill  = { type:'pattern', pattern:'solid', fgColor:{argb:'FF'+YELLOW_BG} };
+      cell.alignment = { wrapText:true, vertical:'top' };
+      ws.getRow(r).height = 30;
+    }
+
+    async function embedImage(ws, dataUrl, rowStart, colStart, widthPx, heightPx) {
+      if (!dataUrl) return;
+      try {
+        const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+        const ext = dataUrl.startsWith('data:image/png') ? 'png' : 'jpeg';
+        const imgId = wb.addImage({ base64, extension: ext });
+        ws.addImage(imgId, {
+          tl: { col: colStart - 1, row: rowStart - 1 },
+          ext: { width: widthPx, height: heightPx }
+        });
+      } catch(err) { console.warn('image embed error', err); }
+    }
+
+    // ── 列幅設定（A〜J=10列） ──
+    function setColWidths(ws) {
+      [18, 14, 8, 8, 8, 8, 8, 14, 8, 8].forEach((w, i) => {
+        ws.getColumn(i+1).width = w;
+      });
+    }
+
+    // ──────────────────────────────────────────
+    //  シート①：表紙
+    // ──────────────────────────────────────────
+    const ws1 = wb.addWorksheet('表紙', { pageSetup:{ paperSize:9, orientation:'portrait' } });
+    setColWidths(ws1);
+
+    let r = 1;
+    hdr(ws1, '作　業　報　告　書', r++);
+
+    // 会社・作成者
+    ws1.mergeCells(r, 7, r, 10);
+    ws1.getCell(r, 7).value = c.company || '';
+    ws1.getCell(r, 7).font = { name:'Meiryo', size:9 };
+    ws1.getCell(r, 7).alignment = { horizontal:'right' };
+    ws1.getRow(r++).height = 16;
+
+    ws1.mergeCells(r, 7, r, 10);
+    ws1.getCell(r, 7).value = '（作成者）' + (c.author || '');
+    ws1.getCell(r, 7).font = { name:'Meiryo', size:9, bold:true };
+    ws1.getCell(r, 7).alignment = { horizontal:'right' };
+    ws1.getRow(r++).height = 16;
+
+    // 宛先
+    ws1.mergeCells(r, 1, r, 5);
+    ws1.getCell(r, 1).value = (c.client || '') + '　' + hn;
+    ws1.getCell(r, 1).font = { name:'Meiryo', size:13, bold:true };
+    ws1.getRow(r++).height = 22;
+
+    // 建物名称・日付
+    labelCell(ws1, r, 1, '建物名称');
+    valueCell(ws1, r, 2, c.building, 4);
+    labelCell(ws1, r, 6, '完了報告日');
+    valueCell(ws1, r, 7, c.date, 4);
+    ws1.getRow(r++).height = 18;
+
+    // 作業名称・期間
+    labelCell(ws1, r, 1, '作業名称');
+    valueCell(ws1, r, 2, c.workname, 4);
+    labelCell(ws1, r, 6, '作業期間');
+    valueCell(ws1, r, 7, c.period, 4);
+    ws1.getRow(r++).height = 18;
+
+    // 作業箇所
+    labelCell(ws1, r, 1, '作業箇所');
+    valueCell(ws1, r, 2, c.areas, 9);
+    ws1.getRow(r).height = 48;
+    r++;
+
+    // 建物全景写真
+    sectionLabel(ws1, r, '建物全景写真', GREEN_DARK);
+    r++;
+    const photoStartRow = r;
+    const photoRows = 20;
+    for (let i = 0; i < photoRows; i++) { ws1.getRow(r + i).height = 15; }
+    ws1.mergeCells(r, 1, r + photoRows - 1, 10);
+    if (c.coverPhoto) {
+      await embedImage(ws1, c.coverPhoto, photoStartRow, 1, 620, photoRows * 15 * 0.75);
+    } else {
+      ws1.getCell(r, 1).value = '（建物全景写真なし）';
+      ws1.getCell(r, 1).alignment = { horizontal:'center', vertical:'middle' };
+      ws1.getCell(r, 1).font = { name:'Meiryo', size:10, color:{argb:'FFAAAAAA'} };
+      ws1.getCell(r, 1).fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF5F5F5'} };
+    }
+    r += photoRows;
+
+    // まとめコメント
+    [
+      ['〇清掃内容について', c.sumCleaning],
+      ['〇使用洗剤について', c.sumDetergent],
+      ['〇今後のメンテナンスのアドバイスについて', c.sumAdvice],
+    ].forEach(([lbl, val]) => {
+      sectionLabel(ws1, r, lbl, GREEN_DARK); r++;
+      ws1.mergeCells(r, 1, r, 10);
+      ws1.getCell(r, 1).value = val || '';
+      ws1.getCell(r, 1).font = { name:'Meiryo', size:10 };
+      ws1.getCell(r, 1).alignment = { wrapText:true, vertical:'top' };
+      ws1.getRow(r).height = 36;
+      r++;
+    });
+
+    // ──────────────────────────────────────────
+    //  シート②：場所ごとに作業前・後（PDF同形式）
+    // ──────────────────────────────────────────
+    const locMap = new Map();
+    data.sections.forEach(sec => {
+      const loc = sec.location || '（場所未設定）';
+      if (!locMap.has(loc)) locMap.set(loc, {});
+      const g = locMap.get(loc);
+      if (!g[sec.type]) g[sec.type] = sec;
+    });
+
+    const IMG_W = 580;   // px
+    const IMG_H = 310;   // px
+    const IMG_ROWS = 22; // Excelの行数（高さ調整）
+
+    let locIdx = 0;
+    for (const [loc, g] of locMap) {
+      locIdx++;
+      const bSec = g['作業前'] || g['作業前中後'] || null;
+      const aSec = g['作業後'] || g['作業前中後'] || null;
+
+      if (bSec || aSec) {
+        const shName = (loc.slice(0,28) + (locIdx > 1 ? locIdx : '')).slice(0, 31);
+        const ws = wb.addWorksheet(shName, { pageSetup:{ paperSize:9, orientation:'portrait' } });
+        setColWidths(ws);
+        let pr = 1;
+
+        hdr(ws, '作　業　報　告　書', pr++);
+        ws.mergeCells(pr, 7, pr, 10);
+        ws.getCell(pr, 7).value = c.company || '';
+        ws.getCell(pr, 7).font = { name:'Meiryo', size:9 };
+        ws.getCell(pr, 7).alignment = { horizontal:'right' };
+        ws.getRow(pr++).height = 14;
+
+        // 作業前ブロック
+        sectionLabel(ws, pr, '作業前', GREEN_DARK); pr++;
+        locationRow(ws, pr, loc); pr++;
+        const bPhotoRow = pr;
+        for (let i = 0; i < IMG_ROWS; i++) ws.getRow(pr + i).height = 15;
+        ws.mergeCells(pr, 1, pr + IMG_ROWS - 1, 10);
+        if (bSec && (bSec.photos||[])[0]) {
+          await embedImage(ws, bSec.photos[0].url, pr, 1, IMG_W, IMG_H);
+        } else {
+          ws.getCell(pr, 1).value = '（写真なし）';
+          ws.getCell(pr, 1).alignment = { horizontal:'center', vertical:'middle' };
+          ws.getCell(pr, 1).fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF8F8F8'} };
+        }
+        pr += IMG_ROWS;
+        commentRow(ws, pr, bSec && bSec.comment); if (bSec && bSec.comment) pr++;
+
+        // 作業後ブロック
+        sectionLabel(ws, pr, '作業後', '27ae60'); pr++;
+        locationRow(ws, pr, loc); pr++;
+        for (let i = 0; i < IMG_ROWS; i++) ws.getRow(pr + i).height = 15;
+        ws.mergeCells(pr, 1, pr + IMG_ROWS - 1, 10);
+        if (aSec && (aSec.photos||[])[0]) {
+          await embedImage(ws, aSec.photos[0].url, pr, 1, IMG_W, IMG_H);
+        } else {
+          ws.getCell(pr, 1).value = '（写真なし）';
+          ws.getCell(pr, 1).alignment = { horizontal:'center', vertical:'middle' };
+          ws.getCell(pr, 1).fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF8F8F8'} };
+        }
+        pr += IMG_ROWS;
+        commentRow(ws, pr, aSec && aSec.comment);
+      }
+
+      // 作業中など他種別
+      const others = Object.entries(g).filter(([t]) => t !== '作業前' && t !== '作業後' && t !== '作業前中後');
+      for (const [type, sec] of others) {
+        const shName2 = (loc.slice(0,24) + '_' + type).slice(0,31);
+        const ws = wb.addWorksheet(shName2, { pageSetup:{ paperSize:9, orientation:'portrait' } });
+        setColWidths(ws);
+        let pr = 1;
+        hdr(ws, '作　業　報　告　書', pr++);
+        ws.mergeCells(pr, 7, pr, 10);
+        ws.getCell(pr, 7).value = c.company || '';
+        ws.getRow(pr++).height = 14;
+        sectionLabel(ws, pr, type, '555555'); pr++;
+        locationRow(ws, pr, loc); pr++;
+        for (let i = 0; i < IMG_ROWS * 2; i++) ws.getRow(pr + i).height = 15;
+        ws.mergeCells(pr, 1, pr + IMG_ROWS * 2 - 1, 10);
+        if ((sec.photos||[])[0]) {
+          await embedImage(ws, sec.photos[0].url, pr, 1, IMG_W, IMG_H * 2);
+        }
+        pr += IMG_ROWS * 2;
+        commentRow(ws, pr, sec.comment);
+      }
+    }
+
+    // ──────────────────────────────────────────
+    //  シート③：まとめ
+    // ──────────────────────────────────────────
+    const wsS = wb.addWorksheet('まとめ', { pageSetup:{ paperSize:9, orientation:'portrait' } });
+    setColWidths(wsS);
+    let sr = 1;
+    hdr(wsS, '作　業　報　告　書', sr++);
+    wsS.mergeCells(sr, 7, sr, 10);
+    wsS.getCell(sr, 7).value = c.company || '';
+    wsS.getCell(sr, 7).font = { name:'Meiryo', size:9 };
+    wsS.getCell(sr, 7).alignment = { horizontal:'right' };
+    wsS.getRow(sr++).height = 16;
+    wsS.mergeCells(sr, 7, sr, 10);
+    wsS.getCell(sr, 7).value = '（作成者）' + (c.author || '');
+    wsS.getCell(sr, 7).font = { name:'Meiryo', size:9, bold:true };
+    wsS.getCell(sr, 7).alignment = { horizontal:'right' };
+    wsS.getRow(sr++).height = 16;
+    wsS.mergeCells(sr, 1, sr, 5);
+    wsS.getCell(sr, 1).value = (c.client||'') + '　' + hn;
+    wsS.getCell(sr, 1).font = { name:'Meiryo', size:13, bold:true };
+    wsS.getRow(sr++).height = 22;
+    labelCell(wsS, sr, 1, '建物名称'); valueCell(wsS, sr, 2, c.building, 4);
+    labelCell(wsS, sr, 6, '完了報告日'); valueCell(wsS, sr, 7, c.date, 4);
+    wsS.getRow(sr++).height = 18;
+    labelCell(wsS, sr, 1, '工事名称'); valueCell(wsS, sr, 2, c.workname, 4);
+    labelCell(wsS, sr, 6, '工事期間'); valueCell(wsS, sr, 7, c.period, 4);
+    wsS.getRow(sr++).height = 18;
+    wsS.mergeCells(sr, 1, sr, 10);
+    wsS.getCell(sr, 1).value = 'この度は定期清掃を実施させて頂きまして、誠にありがとうございました。';
+    wsS.getCell(sr, 1).font = { name:'Meiryo', size:10 };
+    wsS.getCell(sr, 1).alignment = { wrapText:true, vertical:'top' };
+    wsS.getRow(sr).height = 28; sr++;
+    [
+      ['〇清掃内容について', c.sumCleaning],
+      ['〇使用洗剤について', c.sumDetergent],
+      ['〇今後のメンテナンスのアドバイスについて', c.sumAdvice],
+    ].forEach(([lbl, val]) => {
+      sectionLabel(wsS, sr, lbl, GREEN_DARK); sr++;
+      wsS.mergeCells(sr, 1, sr, 10);
+      wsS.getCell(sr, 1).value = val || '';
+      wsS.getCell(sr, 1).font = { name:'Meiryo', size:10 };
+      wsS.getCell(sr, 1).alignment = { wrapText:true, vertical:'top' };
+      wsS.getRow(sr).height = 40; sr++;
+    });
+
+    // ── ダウンロード ──
+    const buffer   = await wb.xlsx.writeBuffer();
+    const blob     = new Blob([buffer], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url      = URL.createObjectURL(blob);
+    const a        = document.createElement('a');
+    const building = c.building || '清掃';
+    const dateStr  = (c.date||'').replace(/-/g,'');
+    a.href         = url;
+    a.download     = `${dateStr}【清掃報告書】${building}.xlsx`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+
+  } catch(err) {
+    alert('Excel出力に失敗しました：' + err.message);
+    console.error(err);
+  } finally {
+    showSpinner(false);
+  }
 }
 
 // =====================================================
@@ -994,6 +1304,11 @@ function showPrint() {
     </table>
     <div style="font-weight:bold;font-size:8pt;margin-bottom:4px;color:#444;">作業箇所</div>
     <div class="p-areas">${e(c.areas)}</div>
+    ${c.coverPhoto ? `
+    <div style="font-weight:bold;font-size:8pt;margin:8px 0 4px;color:#444;">建物全景写真</div>
+    <img src="${c.coverPhoto}" alt="建物全景"
+         style="width:100%;flex:1;min-height:0;object-fit:cover;border:1px solid #ccc;border-radius:4px;">
+    ` : ''}
   </div>`;
 
   // 写真ページ（場所ごとに作業前・後をペア）
