@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#2e7d52">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="清掃報告書">
+<title>清掃作業報告書</title>
+<link rel="manifest" href="manifest.json">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+/* ─── 変数 ─── */
+:root {
+  --primary:       #2e7d52;
+  --primary-dark:  #1e5c38;
+  --primary-light: #eaf5ef;
+  --accent:        #27ae60;
+  --danger:        #e74c3c;
+  --gray-bg:       #f2f6f4;
+}
+/* ─── リセット・基本 ─── */
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{
+  background:var(--gray-bg);
+  font-family:'Hiragino Kaku Gothic ProN','Meiryo','Yu Gothic',sans-serif;
+  padding-bottom:80px;margin:0;font-size:15px;
+}
+/* ─── ナビ ─── */
+.navbar{
+  background:var(--primary)!important;
+  padding:12px 16px;position:sticky;top:0;z-index:200;
+  box-shadow:0 2px 6px rgba(0,0,0,.2);
+}
+.navbar-brand{
+  font-size:1rem;font-weight:bold;color:#fff!important;
+  display:flex;align-items:center;gap:8px;text-decoration:none;
+}
+/* ─── カード ─── */
+.card{
+  border:none;border-radius:14px;
+  box-shadow:0 2px 10px rgba(0,0,0,.07);
+  margin-bottom:14px;background:#fff;
+}
+.card-header{
+  background:var(--primary);color:#fff;
+  border-radius:14px 14px 0 0!important;
+  font-weight:bold;padding:11px 16px;
+  display:flex;align-items:center;gap:8px;font-size:.92rem;
+}
+.card-body{padding:16px;}
+/* ─── フォーム ─── */
+.form-label{font-weight:600;font-size:.83rem;color:#444;margin-bottom:4px;}
+.form-control,.form-select{
+  border-radius:9px;border:1.5px solid #cfe3d8;
+  font-size:.95rem;padding:10px 12px;background:#fff;
+  transition:border-color .2s,box-shadow .2s;
+}
+.form-control:focus,.form-select:focus{
+  border-color:var(--primary);
+  box-shadow:0 0 0 3px rgba(46,125,82,.15);outline:none;
+}
+.field-row{margin-bottom:14px;}
+/* ─── ボタン ─── */
+.btn{border-radius:9px;font-weight:600;padding:10px 18px;font-size:.92rem;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--primary);border-color:var(--primary);color:#fff;}
+.btn-primary:hover,.btn-primary:focus{background:var(--primary-dark);border-color:var(--primary-dark);color:#fff;}
+.btn-success{background:var(--accent);border-color:var(--accent);color:#fff;}
+.btn-success:hover{background:#219a52;border-color:#219a52;}
+.btn-danger{background:var(--danger);border-color:var(--danger);color:#fff;}
+.btn-danger:hover{background:#c0392b;border-color:#c0392b;}
+.btn-outline-secondary{background:#fff;border:1.5px solid #bbb;color:#555;}
+.btn-outline-secondary:hover{background:#f0f0f0;}
+.btn-outline-primary{background:#fff;border:1.5px solid var(--primary);color:var(--primary);}
+.btn-outline-primary:hover{background:var(--primary-light);}
+/* ─── ステップバー ─── */
+.step-bar{display:flex;margin:4px 0 14px;}
+.step-item{
+  flex:1;text-align:center;padding:8px 2px;
+  font-size:.72rem;font-weight:700;color:#aaa;
+  border-bottom:3px solid #ddd;cursor:pointer;
+  transition:color .2s,border-color .2s;
+}
+.step-item.active{color:var(--primary);border-bottom-color:var(--primary);}
+.step-item.done{color:var(--accent);border-bottom-color:var(--accent);}
+/* ─── ボトムバー ─── */
+.bottom-bar{
+  position:fixed;bottom:0;left:0;right:0;
+  background:#fff;box-shadow:0 -2px 12px rgba(0,0,0,.1);
+  padding:12px 14px;display:flex;gap:10px;z-index:100;
+}
+.bottom-bar .btn{flex:1;}
+/* ─── レイアウト ─── */
+.page-container{max-width:640px;margin:0 auto;padding:12px 12px 0;}
+.view{display:none;}
+.view.active{display:block;}
+/* ─── セクションカード ─── */
+.sec-card{
+  background:#fff;border-radius:12px;padding:13px;
+  margin-bottom:10px;box-shadow:0 1px 5px rgba(0,0,0,.07);
+}
+.badge-type{
+  background:var(--primary-light);color:var(--primary);
+  font-size:.72rem;padding:3px 10px;border-radius:20px;font-weight:700;
+}
+/* ─── 写真グリッド ─── */
+.photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px;}
+.photo-thumb{
+  aspect-ratio:1;border-radius:8px;overflow:hidden;
+  position:relative;background:#eee;
+}
+.photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.photo-thumb .del-btn{
+  position:absolute;top:3px;right:3px;
+  background:rgba(0,0,0,.6);color:#fff;
+  border:none;border-radius:50%;
+  width:24px;height:24px;font-size:14px;
+  line-height:24px;text-align:center;cursor:pointer;
+}
+/* ─── アップロードゾーン ─── */
+.upload-zone{
+  border:2px dashed #a8d5bc;border-radius:10px;
+  padding:18px;text-align:center;color:#80b89a;
+  cursor:pointer;transition:all .2s;margin-top:8px;font-size:.84rem;
+}
+.upload-zone:hover{border-color:var(--primary);background:var(--primary-light);color:var(--primary);}
+.upload-zone i{font-size:1.9rem;display:block;margin-bottom:4px;}
+/* ─── その他UI ─── */
+.empty-state{text-align:center;padding:40px 16px;color:#bbb;}
+.empty-state i{font-size:3rem;display:block;margin-bottom:10px;}
+.spinner-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.38);z-index:9999;
+  justify-content:center;align-items:center;
+}
+.spinner-overlay.show{display:flex;}
+.info-tip{
+  background:var(--primary-light);border-left:3px solid var(--primary);
+  border-radius:0 8px 8px 0;padding:8px 12px;
+  font-size:.78rem;color:var(--primary);line-height:1.5;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   印刷 / PDF 専用スタイル
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+@media print{
+  body{background:#fff;padding:0;margin:0;}
+  .no-print{display:none!important;}
+  .navbar{display:none!important;}
+  #view-print{padding:0!important;}
+  .print-page{
+    width:210mm!important;height:297mm!important;
+    margin:0!important;padding:8mm 10mm!important;
+    page-break-after:always;
+    box-shadow:none!important;border-radius:0!important;
+  }
+  .print-page:last-child{page-break-after:auto;}
+  @page{margin:0;size:A4 portrait;}
+}
+#view-print{padding:0;background:#666;}
+.print-page{
+  background:#fff;width:210mm;height:297mm;
+  margin:0 auto 6px;padding:8mm 10mm;
+  box-sizing:border-box;display:flex;flex-direction:column;
+  box-shadow:0 2px 10px rgba(0,0,0,.35);
+}
+/* ページヘッダー */
+.p-page-header{
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:2.5px solid var(--primary);
+  padding-bottom:4px;margin-bottom:5px;flex-shrink:0;
+}
+.p-page-title{font-size:13pt;font-weight:bold;letter-spacing:.3em;color:var(--primary);}
+.p-page-meta{font-size:7.5pt;color:#666;text-align:right;line-height:1.6;}
+/* 写真ブロック */
+.p-photo-block{flex:1;display:flex;flex-direction:column;min-height:0;margin-bottom:5px;}
+.p-photo-block:last-of-type{margin-bottom:0;}
+.p-photo-label{
+  font-size:9.5pt;font-weight:bold;color:#fff;
+  padding:5px 10px;border-radius:4px 4px 0 0;flex-shrink:0;
+}
+.p-photo-label.before{background:var(--primary);}
+.p-photo-label.after {background:#27ae60;}
+.p-photo-label.mid  {background:#8e44ad;}
+.p-photo-label.other{background:#555;}
+.p-location-bar{
+  font-size:8.5pt;font-weight:bold;
+  background:#f0faf5;color:var(--primary);
+  padding:3px 10px;border:1px solid #9ecfb5;
+  border-top:none;flex-shrink:0;
+}
+.p-photo-img{
+  flex:1;width:100%;min-height:0;
+  object-fit:cover;border:1px solid #ccc;
+  border-top:none;border-radius:0 0 4px 4px;display:block;
+}
+.p-photo-empty{
+  flex:1;min-height:0;background:#f8f8f8;
+  border:1px solid #ddd;border-top:none;
+  border-radius:0 0 4px 4px;
+  display:flex;align-items:center;justify-content:center;
+  color:#bbb;font-size:8pt;
+}
+.p-comment-strip{
+  font-size:7.5pt;white-space:pre-wrap;color:#444;
+  background:#fffde7;border-left:3px solid #f0c000;
+  padding:4px 8px;flex-shrink:0;margin-top:4px;
+  border-radius:0 3px 3px 0;
+}
+/* 表紙・まとめ */
+.p-title{
+  text-align:center;font-size:17pt;font-weight:bold;
+  letter-spacing:.5em;border-bottom:3px solid var(--primary);
+  padding-bottom:8px;margin-bottom:12px;
+  color:var(--primary);flex-shrink:0;
+}
+.p-company{text-align:right;font-size:8pt;color:#555;margin-bottom:8px;flex-shrink:0;}
+.p-client {font-size:12pt;font-weight:bold;margin-bottom:10px;flex-shrink:0;}
+.p-table  {width:100%;border-collapse:collapse;margin-bottom:8px;font-size:8.5pt;flex-shrink:0;}
+.p-table th{background:#d6f0e2;padding:4px 8px;border:1px solid #9ecfb5;font-weight:bold;width:22%;}
+.p-table td{padding:4px 8px;border:1px solid #9ecfb5;}
+.p-areas{
+  border:1px solid #ccc;background:#f9f9f9;
+  padding:6px 10px;font-size:8pt;
+  white-space:pre-wrap;margin-bottom:10px;border-radius:4px;flex-shrink:0;
+}
+.p-summary-section{margin-bottom:10px;flex-shrink:0;}
+.p-summary-section h3{
+  font-size:8.5pt;font-weight:bold;
+  background:#d6f0e2;padding:4px 9px;
+  border-left:4px solid var(--primary);margin-bottom:2px;
+}
+.p-summary-section p{
+  padding:5px 9px;font-size:8pt;white-space:pre-wrap;
+  border:1px solid #e0e0e0;border-radius:0 0 4px 4px;
+  background:#fafafa;min-height:24px;margin:0;
+}
+.p-greeting{
+  font-size:8.5pt;line-height:1.9;margin-bottom:12px;
+  padding:8px;background:#f0faf5;border-radius:4px;flex-shrink:0;
+}
+</style>
+</head>
+<body>
+
+<!-- ===== ナビゲーション ===== -->
+<nav class="navbar no-print">
+  <a class="navbar-brand" onclick="showView('home')" style="cursor:pointer;">
+    <i class="bi bi-clipboard2-check-fill"></i>清掃作業報告書
+  </a>
+  <button class="btn btn-sm btn-outline-light" onclick="resetAll()" title="リセット">
+    <i class="bi bi-arrow-counterclockwise"></i>
+  </button>
+</nav>
+
+<div class="spinner-overlay no-print" id="spinner">
+  <div class="spinner-border text-light" style="width:3rem;height:3rem;"></div>
+</div>
+
+<!-- =====================================================
+     ① HOME
+===================================================== -->
+<div id="view-home" class="view active page-container pt-2">
+  <div class="step-bar">
+    <div class="step-item active" onclick="showView('cover')">① 基本情報</div>
+    <div class="step-item" onclick="showView('sections')">② 作業写真</div>
+    <div class="step-item" onclick="showView('preview')">③ 確認・出力</div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><i class="bi bi-house-fill"></i> 清掃作業報告書の作成</div>
+    <div class="card-body">
+      <p class="text-muted mb-3" style="font-size:.88rem;">
+        ステップに沿って情報を入力し、ExcelまたはPDFで報告書を出力できます。
+      </p>
+      <div class="d-grid gap-2">
+        <button class="btn btn-primary btn-lg" onclick="showView('cover')">
+          <i class="bi bi-pencil-square me-2"></i>新規作成・編集を開始
+        </button>
+        <button class="btn btn-outline-primary" onclick="showView('sections')">
+          <i class="bi bi-images me-2"></i>写真・コメント入力
+        </button>
+        <button class="btn btn-outline-secondary" onclick="showView('preview')">
+          <i class="bi bi-eye me-2"></i>プレビュー・出力
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="home-summary" style="display:none;">
+    <div class="card-body">
+      <small class="text-muted d-block mb-1">現在の入力内容</small>
+      <div class="fw-bold" id="home-building">―</div>
+      <div class="text-muted" id="home-info" style="font-size:.83rem;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- =====================================================
+     ② COVER（基本情報）
+===================================================== -->
+<div id="view-cover" class="view page-container pt-2">
+  <div class="step-bar">
+    <div class="step-item active">① 基本情報</div>
+    <div class="step-item" onclick="saveCover(); showView('sections')">② 作業写真</div>
+    <div class="step-item" onclick="saveCover(); showView('preview')">③ 確認・出力</div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><i class="bi bi-building"></i> 物件・作業情報</div>
+    <div class="card-body">
+      <div class="field-row">
+        <label class="form-label">宛先（会社名・個人名）</label>
+        <div class="d-flex gap-2">
+          <input type="text" class="form-control" id="f-client" placeholder="">
+          <select class="form-select" id="f-honorific" style="width:88px;flex-shrink:0;">
+            <option value="様">様</option>
+            <option value="御中">御中</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <label class="form-label">建物名称 <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" id="f-building" placeholder="例：レスタンノール">
+      </div>
+      <div class="row g-2">
+        <div class="col-6 field-row">
+          <label class="form-label">完了報告日</label>
+          <input type="date" class="form-control" id="f-date">
+        </div>
+        <div class="col-6 field-row">
+          <label class="form-label">作業期間</label>
+          <input type="text" class="form-control" id="f-period" placeholder="">
+        </div>
+      </div>
+      <div class="field-row">
+        <label class="form-label">作業名称</label>
+        <input type="text" class="form-control" id="f-workname" placeholder="">
+      </div>
+      <div class="field-row">
+        <label class="form-label">作業箇所</label>
+        <textarea class="form-control" id="f-areas" rows="3" placeholder=""></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><i class="bi bi-person-fill"></i> 作成者情報</div>
+    <div class="card-body">
+      <div class="field-row">
+        <label class="form-label">会社名</label>
+        <input type="text" class="form-control" id="f-company" placeholder="">
+      </div>
+      <div class="field-row">
+        <label class="form-label">担当者名</label>
+        <input type="text" class="form-control" id="f-author" placeholder="">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><i class="bi bi-chat-text-fill"></i> まとめコメント</div>
+    <div class="card-body">
+      <div class="field-row">
+        <label class="form-label">清掃内容について</label>
+        <textarea class="form-control" id="f-summary-cleaning" rows="3" placeholder=""></textarea>
+      </div>
+      <div class="field-row">
+        <label class="form-label">使用洗剤について</label>
+        <textarea class="form-control" id="f-summary-detergent" rows="2" placeholder=""></textarea>
+      </div>
+      <div class="field-row">
+        <label class="form-label">今後のメンテナンスアドバイス</label>
+        <textarea class="form-control" id="f-summary-advice" rows="3" placeholder=""></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-bar no-print">
+    <button class="btn btn-outline-secondary" onclick="showView('home')">
+      <i class="bi bi-arrow-left"></i> 戻る
+    </button>
+    <button class="btn btn-primary" onclick="saveCover()">
+      次へ：写真入力 <i class="bi bi-arrow-right"></i>
+    </button>
+  </div>
+</div>
+
+<!-- =====================================================
+     ③ SECTIONS（作業写真）
+===================================================== -->
+<div id="view-sections" class="view page-container pt-2">
+  <div class="step-bar">
+    <div class="step-item done" onclick="showView('cover')">① 基本情報</div>
+    <div class="step-item active">② 作業写真</div>
+    <div class="step-item" onclick="showView('preview')">③ 確認・出力</div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><i class="bi bi-plus-circle-fill"></i> セクションを追加</div>
+    <div class="card-body">
+      <div class="row g-2 mb-2">
+        <div class="col-7">
+          <label class="form-label">作業場所</label>
+          <input type="text" class="form-control" id="add-location" placeholder="">
+        </div>
+        <div class="col-5">
+          <label class="form-label">種別</label>
+          <select class="form-select" id="add-type">
+            <option value="作業前">作業前</option>
+            <option value="作業中" selected>作業中</option>
+            <option value="作業後">作業後</option>
+            <option value="作業前中後">前中後</option>
+            <option value="前後">前後</option>
+            <option value="設備">設備</option>
+          </select>
+        </div>
+      </div>
+      <div class="mb-2">
+        <label class="form-label">コメント</label>
+        <textarea class="form-control" id="add-comment" rows="2" placeholder=""></textarea>
+      </div>
+      <button class="btn btn-success w-100" onclick="addSection()">
+        <i class="bi bi-plus-lg me-1"></i>追加
+      </button>
+      <div class="info-tip mt-2">
+        <i class="bi bi-info-circle me-1"></i>
+        <b>PDF出力レイアウト：</b>同じ場所名で「作業前」「作業後」を追加すると、A4用紙1枚に上段＝作業前・下段＝作業後の写真が大きく印刷されます。
+      </div>
+    </div>
+  </div>
+
+  <div id="section-list"></div>
+
+  <div class="bottom-bar no-print">
+    <button class="btn btn-outline-secondary" onclick="showView('cover')">
+      <i class="bi bi-arrow-left"></i> 戻る
+    </button>
+    <button class="btn btn-primary" onclick="showView('preview')">
+      確認・出力へ <i class="bi bi-arrow-right"></i>
+    </button>
+  </div>
+</div>
+
+<!-- =====================================================
+     ④ PREVIEW（確認・出力）
+===================================================== -->
+<div id="view-preview" class="view page-container pt-2">
+  <div class="step-bar">
+    <div class="step-item done" onclick="showView('cover')">① 基本情報</div>
+    <div class="step-item done" onclick="showView('sections')">② 作業写真</div>
+    <div class="step-item active">③ 確認・出力</div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><i class="bi bi-file-text-fill"></i> 報告書サマリ</div>
+    <div class="card-body p-0">
+      <table class="table table-sm mb-0" style="font-size:.88rem;" id="preview-table"></table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><i class="bi bi-download"></i> 出力</div>
+    <div class="card-body d-grid gap-3">
+      <button class="btn btn-success btn-lg" onclick="exportExcel()">
+        <i class="bi bi-file-earmark-excel-fill me-2"></i>Excelで出力（.xlsx）
+      </button>
+      <button class="btn btn-danger btn-lg" onclick="showPrint()">
+        <i class="bi bi-file-earmark-pdf-fill me-2"></i>PDF印刷プレビュー
+      </button>
+      <p class="text-muted mb-0" style="font-size:.78rem;text-align:center;">
+        PDFプレビューを開いた後、ブラウザの印刷機能からPDF保存できます
+      </p>
+    </div>
+  </div>
+
+  <div class="bottom-bar no-print">
+    <button class="btn btn-outline-secondary" onclick="showView('sections')">
+      <i class="bi bi-arrow-left"></i> 戻る
+    </button>
+    <button class="btn btn-outline-primary" onclick="showView('home')">
+      <i class="bi bi-house"></i> ホーム
+    </button>
+  </div>
+</div>
+
+<!-- =====================================================
+     ⑤ PRINT（PDF印刷プレビュー）
+===================================================== -->
+<div id="view-print" class="view">
+  <div class="no-print" style="background:var(--primary);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;">
+    <span style="color:#fff;font-weight:bold;font-size:.95rem;">
+      <i class="bi bi-printer-fill me-2"></i>印刷プレビュー
+    </span>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-sm btn-outline-light" onclick="showView('preview')">
+        <i class="bi bi-arrow-left"></i> 戻る
+      </button>
+      <button class="btn btn-sm btn-warning fw-bold" onclick="window.print()">
+        <i class="bi bi-printer-fill me-1"></i>印刷 / PDF保存
+      </button>
+    </div>
+  </div>
+  <div id="print-content" style="padding:10px 0;"></div>
+</div>
+
+<!-- =====================================================
+     MODAL：セクション編集
+===================================================== -->
+<div class="modal fade no-print" id="editModal" tabindex="-1">
+  <div class="modal-dialog modal-fullscreen-sm-down">
+    <div class="modal-content">
+      <div class="modal-header" style="background:var(--primary);">
+        <h5 class="modal-title text-white fw-bold">セクション編集</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:16px;">
+        <input type="hidden" id="edit-id">
+        <div class="field-row">
+          <label class="form-label">作業場所</label>
+          <input type="text" class="form-control" id="edit-location">
+        </div>
+        <div class="field-row">
+          <label class="form-label">種別</label>
+          <select class="form-select" id="edit-type">
+            <option value="作業前">作業前</option>
+            <option value="作業中">作業中</option>
+            <option value="作業後">作業後</option>
+            <option value="作業前中後">前中後</option>
+            <option value="前後">前後</option>
+            <option value="設備">設備</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <label class="form-label">コメント</label>
+          <textarea class="form-control" id="edit-comment" rows="3"></textarea>
+        </div>
+        <div class="field-row">
+          <label class="form-label">写真（タップで追加）</label>
+          <div class="photo-grid" id="edit-photo-grid"></div>
+          <div class="upload-zone mt-2" onclick="document.getElementById('edit-file-input').click()">
+            <i class="bi bi-camera-fill"></i>
+            写真を追加<br><small>カメラ撮影またはライブラリから選択</small>
+          </div>
+          <input type="file" id="edit-file-input" multiple accept="image/*"
+                 capture="environment" style="display:none"
+                 onchange="handlePhotoUpload(this)">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">キャンセル</button>
+        <button class="btn btn-primary" onclick="saveEdit()">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// =====================================================
+//  データストア（localStorage）
+// =====================================================
+const STORAGE_KEY = 'cleaning_report_v2';
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return {
+    cover: {
+      client:'', honorific:'様', building:'',
+      date: new Date().toISOString().slice(0,10),
+      period:'', workname:'', areas:'',
+      company:'株式会社リンクス・エステート', author:'',
+      sumCleaning:'', sumDetergent:'', sumAdvice:''
+    },
+    sections: []
+  };
+}
+
+function saveData(d) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
+  catch(e) { alert('保存に失敗しました（ストレージ容量超過の可能性）'); }
+}
+
+let data = loadData();
+
+// =====================================================
+//  ビュー制御
+// =====================================================
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  window.scrollTo(0, 0);
+  if (name === 'cover')    fillCoverForm();
+  if (name === 'sections') renderSections();
+  if (name === 'preview')  renderPreview();
+  if (name === 'home')     renderHome();
+}
+
+// =====================================================
+//  HOME
+// =====================================================
+function renderHome() {
+  const s = document.getElementById('home-summary');
+  if (data.cover.building) {
+    s.style.display = '';
+    document.getElementById('home-building').textContent = data.cover.building;
+    const pc = data.sections.reduce((a, s) => a + (s.photos||[]).length, 0);
+    document.getElementById('home-info').textContent =
+      `${data.cover.date} ／ ${data.cover.workname||'―'} ／ セクション${data.sections.length}件・写真${pc}枚`;
+  } else {
+    s.style.display = 'none';
+  }
+}
+
+// =====================================================
+//  COVER
+// =====================================================
+function fillCoverForm() {
+  const c = data.cover;
+  document.getElementById('f-client').value           = c.client || '';
+  document.getElementById('f-honorific').value        = c.honorific || '様';
+  document.getElementById('f-building').value         = c.building || '';
+  document.getElementById('f-date').value             = c.date || '';
+  document.getElementById('f-period').value           = c.period || '';
+  document.getElementById('f-workname').value         = c.workname || '';
+  document.getElementById('f-areas').value            = c.areas || '';
+  document.getElementById('f-company').value          = c.company || '';
+  document.getElementById('f-author').value           = c.author || '';
+  document.getElementById('f-summary-cleaning').value = c.sumCleaning || '';
+  document.getElementById('f-summary-detergent').value= c.sumDetergent || '';
+  document.getElementById('f-summary-advice').value   = c.sumAdvice || '';
+}
+
+function saveCover() {
+  data.cover.client       = document.getElementById('f-client').value.trim();
+  data.cover.honorific    = document.getElementById('f-honorific').value;
+  data.cover.building     = document.getElementById('f-building').value.trim();
+  data.cover.date         = document.getElementById('f-date').value;
+  data.cover.period       = document.getElementById('f-period').value.trim();
+  data.cover.workname     = document.getElementById('f-workname').value.trim();
+  data.cover.areas        = document.getElementById('f-areas').value.trim();
+  data.cover.company      = document.getElementById('f-company').value.trim();
+  data.cover.author       = document.getElementById('f-author').value.trim();
+  data.cover.sumCleaning  = document.getElementById('f-summary-cleaning').value.trim();
+  data.cover.sumDetergent = document.getElementById('f-summary-detergent').value.trim();
+  data.cover.sumAdvice    = document.getElementById('f-summary-advice').value.trim();
+  saveData(data);
+  showView('sections');
+}
+
+// =====================================================
+//  SECTIONS
+// =====================================================
+function uuid() {
+  return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,
+    c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c/4).toString(16));
+}
+
+function addSection() {
+  const loc = document.getElementById('add-location').value.trim();
+  if (!loc) { document.getElementById('add-location').focus(); return; }
+  data.sections.push({
+    id: uuid(),
+    location: loc,
+    type: document.getElementById('add-type').value,
+    comment: document.getElementById('add-comment').value.trim(),
+    photos: []
+  });
+  document.getElementById('add-location').value = '';
+  document.getElementById('add-comment').value  = '';
+  saveData(data);
+  renderSections();
+}
+
+function deleteSection(id) {
+  if (!confirm('このセクションを削除しますか？')) return;
+  data.sections = data.sections.filter(s => s.id !== id);
+  saveData(data);
+  renderSections();
+}
+
+function renderSections() {
+  const el = document.getElementById('section-list');
+  if (!data.sections.length) {
+    el.innerHTML = `<div class="empty-state">
+      <i class="bi bi-images"></i>
+      <div class="fw-bold mb-1">セクションがありません</div>
+      <div style="font-size:.83rem;">上のフォームから追加してください</div>
+    </div>`;
+    return;
+  }
+  el.innerHTML = data.sections.map(sec => `
+    <div class="sec-card">
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <span class="badge-type">${sec.type}</span>
+            <span class="fw-bold" style="font-size:.93rem;">${sec.location||'（場所未設定）'}</span>
+          </div>
+          ${sec.comment ? `<div class="text-muted" style="font-size:.8rem;margin-bottom:6px;">${sec.comment.slice(0,60)}${sec.comment.length>60?'…':''}</div>` : ''}
+          <div class="photo-grid" id="grid-${sec.id}">
+            ${(sec.photos||[]).map(p=>`
+              <div class="photo-thumb">
+                <img src="${p.url}" alt="写真">
+                <button class="del-btn" onclick="deletePhoto('${sec.id}','${p.id}')">×</button>
+              </div>`).join('')}
+          </div>
+          <div class="upload-zone" onclick="triggerUpload('${sec.id}')">
+            <i class="bi bi-camera-fill"></i>
+            <span style="font-size:.82rem;">写真を追加（タップ）</span>
+          </div>
+          <input type="file" id="fu-${sec.id}" multiple accept="image/*"
+                 capture="environment" style="display:none"
+                 onchange="uploadToSection('${sec.id}',this)">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+          <button class="btn btn-sm btn-outline-primary px-2 py-1" onclick="openEdit('${sec.id}')">
+            <i class="bi bi-pencil"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-danger px-2 py-1" onclick="deleteSection('${sec.id}')">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function triggerUpload(secId) {
+  document.getElementById('fu-'+secId).click();
+}
+
+function uploadToSection(secId, input) {
+  const sec = data.sections.find(s => s.id === secId);
+  if (!sec) return;
+  processFiles(Array.from(input.files), (url) => {
+    sec.photos.push({ id: uuid(), url });
+    saveData(data);
+    renderSections();
+  });
+  input.value = '';
+}
+
+function processFiles(files, cb) {
+  showSpinner(true);
+  let done = 0;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      resizeImage(e.target.result, 1200, url => {
+        cb(url);
+        done++;
+        if (done === files.length) showSpinner(false);
+      });
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function resizeImage(dataUrl, maxPx, cb) {
+  const img = new Image();
+  img.onload = function() {
+    let w = img.width, h = img.height;
+    if (w > maxPx || h > maxPx) {
+      if (w > h) { h = Math.round(h * maxPx/w); w = maxPx; }
+      else { w = Math.round(w * maxPx/h); h = maxPx; }
+    }
+    const cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    cv.getContext('2d').drawImage(img, 0, 0, w, h);
+    cb(cv.toDataURL('image/jpeg', 0.82));
+  };
+  img.src = dataUrl;
+}
+
+function deletePhoto(secId, photoId) {
+  if (!confirm('この写真を削除しますか？')) return;
+  const sec = data.sections.find(s => s.id === secId);
+  if (sec) { sec.photos = sec.photos.filter(p => p.id !== photoId); saveData(data); renderSections(); }
+}
+
+// =====================================================
+//  編集モーダル
+// =====================================================
+let editModal = null;
+document.addEventListener('DOMContentLoaded', () => {
+  editModal = new bootstrap.Modal(document.getElementById('editModal'));
+});
+
+function openEdit(secId) {
+  const sec = data.sections.find(s => s.id === secId);
+  if (!sec) return;
+  document.getElementById('edit-id').value       = secId;
+  document.getElementById('edit-location').value = sec.location;
+  document.getElementById('edit-type').value     = sec.type;
+  document.getElementById('edit-comment').value  = sec.comment;
+  renderEditPhotos(sec);
+  editModal.show();
+}
+
+function renderEditPhotos(sec) {
+  document.getElementById('edit-photo-grid').innerHTML = (sec.photos||[]).map(p => `
+    <div class="photo-thumb" id="eth-${p.id}">
+      <img src="${p.url}" alt="写真">
+      <button class="del-btn" onclick="deleteEditPhoto('${sec.id}','${p.id}')">×</button>
+    </div>`).join('');
+}
+
+function deleteEditPhoto(secId, photoId) {
+  const sec = data.sections.find(s => s.id === secId);
+  if (sec) { sec.photos = sec.photos.filter(p => p.id !== photoId); saveData(data); renderEditPhotos(sec); renderSections(); }
+}
+
+function handlePhotoUpload(input) {
+  const secId = document.getElementById('edit-id').value;
+  const sec   = data.sections.find(s => s.id === secId);
+  if (!sec) return;
+  processFiles(Array.from(input.files), url => {
+    sec.photos.push({ id: uuid(), url });
+    saveData(data);
+    renderEditPhotos(sec);
+    renderSections();
+  });
+  input.value = '';
+}
+
+function saveEdit() {
+  const secId = document.getElementById('edit-id').value;
+  const sec   = data.sections.find(s => s.id === secId);
+  if (sec) {
+    sec.location = document.getElementById('edit-location').value.trim();
+    sec.type     = document.getElementById('edit-type').value;
+    sec.comment  = document.getElementById('edit-comment').value.trim();
+    saveData(data); renderSections();
+  }
+  editModal.hide();
+}
+
+// =====================================================
+//  PREVIEW
+// =====================================================
+function renderPreview() {
+  const c = data.cover;
+  const totalPhotos = data.sections.reduce((a,s)=>a+(s.photos||[]).length,0);
+  const rows = [
+    ['宛先', (c.client||'―') + ' ' + (c.honorific||'様')],
+    ['建物名称', c.building||'―'],
+    ['完了報告日', c.date||'―'],
+    ['作業名称', c.workname||'―'],
+    ['作業期間', c.period||'―'],
+    ['担当者', c.author||'―'],
+    ['セクション数', data.sections.length + '件'],
+    ['写真合計', totalPhotos + '枚'],
+  ];
+  document.getElementById('preview-table').innerHTML = '<tbody>' +
+    rows.map(([th,td]) => `<tr><th class="text-muted ps-3" style="width:36%;">${th}</th><td>${td}</td></tr>`).join('') +
+    '</tbody>';
+}
+
+// =====================================================
+//  Excel 出力
+// =====================================================
+function exportExcel() {
+  showSpinner(true);
+  setTimeout(() => {
+    try {
+      const wb = XLSX.utils.book_new();
+      const c  = data.cover;
+      const hn = c.honorific || '様';
+
+      // 表紙
+      const ws1 = XLSX.utils.aoa_to_sheet([
+        ['作　業　報　告　書'],
+        ['','','','','','','',c.company],
+        ['','','','','','','','（作成者）'+c.author],
+        [c.client + '　' + hn],
+        ['建物名称',c.building,'','','','完了報告日',c.date],
+        ['作業名称',c.workname,'','','','作業期間',c.period],
+        ['作業箇所',c.areas],
+        [],
+        ['〇清掃内容について'],[c.sumCleaning||''],
+        ['〇使用洗剤について'],[c.sumDetergent||''],
+        ['〇今後のメンテナンスアドバイスについて'],[c.sumAdvice||''],
+      ]);
+      ws1['!cols'] = [{wch:14},{wch:22},{wch:8},{wch:8},{wch:8},{wch:14},{wch:16}];
+      XLSX.utils.book_append_sheet(wb, ws1, '表紙');
+
+      // セクション別シート
+      const groups = {};
+      data.sections.forEach(sec => {
+        const k = sec.type||'作業中';
+        if (!groups[k]) groups[k] = [];
+        groups[k].push(sec);
+      });
+      Object.entries(groups).forEach(([type, secs]) => {
+        const rows = [['作　業　報　告　書'],['','','','','','','',c.company]];
+        secs.forEach(sec => {
+          rows.push([type + '　写真']);
+          rows.push(['作業場所', sec.location]);
+          rows.push(['コメント', sec.comment]);
+          rows.push(['写真枚数', (sec.photos||[]).length + '枚']);
+          rows.push([]);
+        });
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        ws['!cols'] = [{wch:14},{wch:30}];
+        XLSX.utils.book_append_sheet(wb, ws, type.slice(0,31));
+      });
+
+      // まとめ
+      const wsS = XLSX.utils.aoa_to_sheet([
+        ['作　業　報　告　書'],
+        ['','','','','','','',c.company],
+        ['','','','','','','','（作成者）'+c.author],
+        [c.client + '　' + hn],
+        ['建物名称',c.building,'','','','完了報告日',c.date],
+        ['工事名称',c.workname,'','','','工事期間',c.period],
+        ['作業箇所',c.areas],[],
+        ['この度は定期清掃を実施させて頂きまして、誠にありがとうございました。'],[],
+        ['〇清掃内容について'],[c.sumCleaning||''],
+        ['〇使用洗剤について'],[c.sumDetergent||''],
+        ['〇今後のメンテナンスのアドバイスについて'],[c.sumAdvice||''],
+      ]);
+      wsS['!cols'] = [{wch:14},{wch:22},{wch:8},{wch:8},{wch:8},{wch:14},{wch:16}];
+      XLSX.utils.book_append_sheet(wb, wsS, 'まとめ');
+
+      const building = c.building || '清掃';
+      const dateStr  = (c.date||'').replace(/-/g,'');
+      XLSX.writeFile(wb, `${dateStr}【清掃報告書】${building}.xlsx`);
+    } catch(e) {
+      alert('Excel出力に失敗しました：' + e.message);
+    } finally {
+      showSpinner(false);
+    }
+  }, 50);
+}
+
+// =====================================================
+//  PDF 印刷プレビュー
+// =====================================================
+function showPrint() {
+  const c = data.cover;
+  const fmtDate = c.date ? c.date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1年$2月$3日') : '';
+  const hn = c.honorific || '様';
+  let html = '';
+
+  // 表紙
+  html += `<div class="print-page">
+    <div class="p-title">作　業　報　告　書</div>
+    <div class="p-company">${e(c.company)}<br>（作成者）${e(c.author)}</div>
+    <div class="p-client">${e(c.client)}　${e(hn)}</div>
+    <table class="p-table">
+      <tr><th>建物名称</th><td>${e(c.building)}</td><th>完了報告日</th><td>${e(fmtDate)}</td></tr>
+      <tr><th>作業名称</th><td>${e(c.workname)}</td><th>作業期間</th><td>${e(c.period)}</td></tr>
+    </table>
+    <div style="font-weight:bold;font-size:8pt;margin-bottom:4px;color:#444;">作業箇所</div>
+    <div class="p-areas">${e(c.areas)}</div>
+  </div>`;
+
+  // 写真ページ（場所ごとに作業前・後をペア）
+  const locMap = new Map();
+  data.sections.forEach(sec => {
+    const loc = sec.location || '（場所未設定）';
+    if (!locMap.has(loc)) locMap.set(loc, {});
+    const g = locMap.get(loc);
+    if (!g[sec.type]) g[sec.type] = sec;
+  });
+
+  locMap.forEach((g, loc) => {
+    const bSec = g['作業前'] || g['作業前中後'] || null;
+    const aSec = g['作業後'] || g['作業前中後'] || null;
+
+    if (bSec || aSec) {
+      const bPhoto = bSec && (bSec.photos||[])[0];
+      const aPhoto = aSec && (aSec.photos||[])[0];
+      const comment = (bSec && bSec.comment) || (aSec && aSec.comment) || '';
+      html += `<div class="print-page">
+        <div class="p-page-header">
+          <span class="p-page-title">作　業　報　告　書</span>
+          <span class="p-page-meta">${e(c.company)}<br>${e(c.building)}</span>
+        </div>
+        <div class="p-photo-block">
+          <div class="p-photo-label before">作業前</div>
+          <div class="p-location-bar">場所：${e(loc)}</div>
+          ${bPhoto ? `<img class="p-photo-img" src="${bPhoto.url}" alt="作業前">` : '<div class="p-photo-empty">（写真なし）</div>'}
+        </div>
+        <div class="p-photo-block">
+          <div class="p-photo-label after">作業後</div>
+          <div class="p-location-bar">場所：${e(loc)}</div>
+          ${aPhoto ? `<img class="p-photo-img" src="${aPhoto.url}" alt="作業後">` : '<div class="p-photo-empty">（写真なし）</div>'}
+        </div>
+        ${comment ? `<div class="p-comment-strip">＜コメント＞　${e(comment)}</div>` : ''}
+      </div>`;
+    }
+
+    Object.entries(g)
+      .filter(([t]) => t !== '作業前' && t !== '作業後' && t !== '作業前中後')
+      .forEach(([type, sec]) => {
+        const photo = (sec.photos||[])[0];
+        html += `<div class="print-page">
+          <div class="p-page-header">
+            <span class="p-page-title">作　業　報　告　書</span>
+            <span class="p-page-meta">${e(c.company)}<br>${e(c.building)}</span>
+          </div>
+          <div class="p-photo-block">
+            <div class="p-photo-label ${type==='作業中'?'mid':'other'}">${e(type)}</div>
+            <div class="p-location-bar">場所：${e(loc)}</div>
+            ${photo ? `<img class="p-photo-img" src="${photo.url}" alt="${e(type)}">` : '<div class="p-photo-empty">（写真なし）</div>'}
+          </div>
+          ${sec.comment ? `<div class="p-comment-strip">＜コメント＞　${e(sec.comment)}</div>` : ''}
+        </div>`;
+      });
+  });
+
+  // まとめ
+  html += `<div class="print-page">
+    <div class="p-title">作　業　報　告　書</div>
+    <div class="p-company">${e(c.company)}<br>（作成者）${e(c.author)}</div>
+    <div class="p-client">${e(c.client)}　${e(hn)}</div>
+    <table class="p-table">
+      <tr><th>建物名称</th><td>${e(c.building)}</td><th>完了報告日</th><td>${e(fmtDate)}</td></tr>
+      <tr><th>工事名称</th><td>${e(c.workname)}</td><th>工事期間</th><td>${e(c.period)}</td></tr>
+    </table>
+    <div class="p-greeting">
+      この度は定期清掃を実施させて頂きまして、誠にありがとうございました。<br>
+      今後ともよろしくお願いいたします。
+    </div>
+    <div class="p-summary-section"><h3>〇清掃内容について</h3><p>${e(c.sumCleaning)||'―'}</p></div>
+    <div class="p-summary-section"><h3>〇使用洗剤について</h3><p>${e(c.sumDetergent)||'―'}</p></div>
+    <div class="p-summary-section"><h3>〇今後のメンテナンスのアドバイスについて</h3><p>${e(c.sumAdvice)||'―'}</p></div>
+  </div>`;
+
+  document.getElementById('print-content').innerHTML = html;
+  showView('print');
+}
+
+// =====================================================
+//  ユーティリティ
+// =====================================================
+function e(str) {
+  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+function showSpinner(show) {
+  document.getElementById('spinner').classList.toggle('show', show);
+}
+function resetAll() {
+  if (!confirm('入力データをすべてリセットしますか？')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  data = loadData();
+  showView('home');
+}
+
+// 初期化
+document.addEventListener('DOMContentLoaded', () => { fillCoverForm(); renderHome(); });
+</script>
+</body>
+</html>

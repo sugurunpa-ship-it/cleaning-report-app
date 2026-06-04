@@ -1,0 +1,18 @@
+{
+  "name": "清掃作業報告書",
+  "short_name": "清掃報告書",
+  "description": "定期清掃作業報告書の作成・出力アプリ",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#2e7d52",
+  "theme_color": "#2e7d52",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/clipboard2-check-fill.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
