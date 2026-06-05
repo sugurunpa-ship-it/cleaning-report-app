@@ -163,59 +163,58 @@ body{
 #view-print{padding:0;background:#666;}
 .print-page{
   background:#fff;width:210mm;height:297mm;
-  margin:0 auto 6px;padding:8mm 10mm;
+  margin:0 auto 6px;padding:6mm 10mm;
   box-sizing:border-box;display:flex;flex-direction:column;
   box-shadow:0 2px 10px rgba(0,0,0,.35);
+  overflow:hidden; /* ページ超過を防ぐ */
 }
 /* ページヘッダー */
 .p-page-header{
   display:flex;align-items:center;justify-content:space-between;
-  border-bottom:2.5px solid var(--primary);
-  padding-bottom:4px;margin-bottom:5px;flex-shrink:0;
+  border-bottom:2px solid var(--primary);
+  padding-bottom:3px;margin-bottom:4px;flex-shrink:0;
 }
-.p-page-title{font-size:13pt;font-weight:bold;letter-spacing:.3em;color:var(--primary);}
-.p-page-meta{font-size:7.5pt;color:#666;text-align:right;line-height:1.6;}
-/* 写真ブロック */
-.p-photo-block{flex:1;display:flex;flex-direction:column;min-height:0;margin-bottom:5px;}
+.p-page-title{font-size:12pt;font-weight:bold;letter-spacing:.3em;color:var(--primary);}
+.p-page-meta{font-size:7pt;color:#666;text-align:right;line-height:1.5;}
+/* 写真ブロック — flex:1 で枚数に応じて均等分割 */
+.p-photo-block{
+  flex:1;display:flex;flex-direction:column;
+  min-height:0;margin-bottom:4px;overflow:hidden;
+}
 .p-photo-block:last-of-type{margin-bottom:0;}
 .p-photo-label{
-  font-size:9.5pt;font-weight:bold;color:#fff;
-  padding:5px 10px;border-radius:4px 4px 0 0;flex-shrink:0;
+  font-size:9pt;font-weight:bold;color:#fff;
+  padding:3px 10px;border-radius:4px 4px 0 0;flex-shrink:0;
+  line-height:1.4;
 }
 .p-photo-label.before{background:var(--primary);}
 .p-photo-label.after {background:#27ae60;}
 .p-photo-label.mid  {background:#8e44ad;}
 .p-photo-label.other{background:#555;}
 .p-location-bar{
-  font-size:8.5pt;font-weight:bold;
+  font-size:7.5pt;font-weight:bold;
   background:#f0faf5;color:var(--primary);
-  padding:3px 10px;border:1px solid #9ecfb5;
+  padding:2px 10px;border:1px solid #9ecfb5;
   border-top:none;flex-shrink:0;
 }
 .p-photo-img{
   flex:1;width:100%;min-height:0;
   object-fit:cover;border:1px solid #ccc;
-  border-top:none;border-radius:0 0 4px 4px;display:block;
+  border-top:none;display:block;
 }
 .p-photo-empty{
   flex:1;min-height:0;background:#f8f8f8;
   border:1px solid #ddd;border-top:none;
-  border-radius:0 0 4px 4px;
   display:flex;align-items:center;justify-content:center;
   color:#bbb;font-size:8pt;
 }
-.p-comment-strip{
-  font-size:7.5pt;white-space:pre-wrap;color:#444;
-  background:#fffde7;border-left:3px solid #f0c000;
-  padding:4px 8px;flex-shrink:0;margin-top:4px;
-  border-radius:0 3px 3px 0;
-}
-/* 写真直下のコメント */
+/* 写真直下のコメント（高さを抑えてページ超過を防ぐ） */
 .p-comment-under{
-  font-size:7pt;white-space:pre-wrap;color:#444;
+  font-size:6.5pt;color:#444;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;
   background:#fffde7;border:1px solid #f0e090;
-  border-top:none;padding:3px 8px;flex-shrink:0;
-  border-radius:0 0 4px 4px;line-height:1.5;
+  border-top:none;padding:2px 8px;flex-shrink:0;
+  line-height:1.4;
 }
 /* 写真追加ボタン */
 .upload-btn-group{
@@ -1311,7 +1310,7 @@ function showPrint() {
     ` : ''}
   </div>`;
 
-  // 写真ページ（場所ごとに作業前・後をペア）
+  // 写真ページ（場所ごとに作業前・中・後を1ページに均等配置）
   const locMap = new Map();
   data.sections.forEach(sec => {
     const loc = sec.location || '（場所未設定）';
@@ -1320,51 +1319,49 @@ function showPrint() {
     if (!g[sec.type]) g[sec.type] = sec;
   });
 
-  locMap.forEach((g, loc) => {
-    const bSec = g['作業前'] || g['作業前中後'] || null;
-    const aSec = g['作業後'] || g['作業前中後'] || null;
+  // ラベルクラスを返すヘルパー
+  function labelClass(type) {
+    return type === '作業前' ? 'before' : type === '作業後' ? 'after' : type === '作業中' ? 'mid' : 'other';
+  }
 
-    if (bSec || aSec) {
-      const bPhoto   = bSec && (bSec.photos||[])[0];
-      const aPhoto   = aSec && (aSec.photos||[])[0];
-      const bComment = (bSec && bSec.comment) || '';
-      const aComment = (aSec && aSec.comment) || '';
-      html += `<div class="print-page">
-        <div class="p-page-header">
-          <span class="p-page-title">作　業　報　告　書</span>
-          <span class="p-page-meta">${e(c.company)}<br>${e(c.building)}</span>
-        </div>
-        <div class="p-photo-block">
-          <div class="p-photo-label before">作業前</div>
-          <div class="p-location-bar">場所：${e(loc)}</div>
-          ${bPhoto ? `<img class="p-photo-img" src="${bPhoto.url}" alt="作業前">` : '<div class="p-photo-empty">（写真なし）</div>'}
-          ${bComment ? `<div class="p-comment-under">＜コメント＞　${e(bComment)}</div>` : ''}
-        </div>
-        <div class="p-photo-block">
-          <div class="p-photo-label after">作業後</div>
-          <div class="p-location-bar">場所：${e(loc)}</div>
-          ${aPhoto ? `<img class="p-photo-img" src="${aPhoto.url}" alt="作業後">` : '<div class="p-photo-empty">（写真なし）</div>'}
-          ${aComment ? `<div class="p-comment-under">＜コメント＞　${e(aComment)}</div>` : ''}
-        </div>
-      </div>`;
+  // 写真ブロックHTMLを生成
+  function photoBlock(type, sec, loc) {
+    const photo = sec && (sec.photos||[])[0];
+    const comment = (sec && sec.comment) || '';
+    return `<div class="p-photo-block">
+      <div class="p-photo-label ${labelClass(type)}">${e(type)}</div>
+      <div class="p-location-bar">場所：${e(loc)}</div>
+      ${photo
+        ? `<img class="p-photo-img" src="${photo.url}" alt="${e(type)}">`
+        : '<div class="p-photo-empty">（写真なし）</div>'}
+      ${comment ? `<div class="p-comment-under">＜コメント＞　${e(comment)}</div>` : ''}
+    </div>`;
+  }
+
+  // ページヘッダーHTML
+  function pageHeader() {
+    return `<div class="p-page-header">
+      <span class="p-page-title">作　業　報　告　書</span>
+      <span class="p-page-meta">${e(c.company)}<br>${e(c.building)}</span>
+    </div>`;
+  }
+
+  locMap.forEach((g, loc) => {
+    // 作業前・中・後を検出し、存在する順番で1ページに並べる
+    const MAIN_TYPES = ['作業前', '作業中', '作業後'];
+    const mainBlocks = MAIN_TYPES.filter(t => g[t]);
+
+    // 前中後いずれかがある → 1ページにまとめる
+    if (mainBlocks.length > 0) {
+      const blocksHtml = mainBlocks.map(t => photoBlock(t, g[t], loc)).join('');
+      html += `<div class="print-page">${pageHeader()}${blocksHtml}</div>`;
     }
 
+    // 前中後以外の種別（設備・前後・前中後 など）は個別ページ
     Object.entries(g)
-      .filter(([t]) => t !== '作業前' && t !== '作業後' && t !== '作業前中後')
+      .filter(([t]) => !MAIN_TYPES.includes(t))
       .forEach(([type, sec]) => {
-        const photo = (sec.photos||[])[0];
-        html += `<div class="print-page">
-          <div class="p-page-header">
-            <span class="p-page-title">作　業　報　告　書</span>
-            <span class="p-page-meta">${e(c.company)}<br>${e(c.building)}</span>
-          </div>
-          <div class="p-photo-block">
-            <div class="p-photo-label ${type==='作業中'?'mid':'other'}">${e(type)}</div>
-            <div class="p-location-bar">場所：${e(loc)}</div>
-            ${photo ? `<img class="p-photo-img" src="${photo.url}" alt="${e(type)}">` : '<div class="p-photo-empty">（写真なし）</div>'}
-            ${sec.comment ? `<div class="p-comment-under">＜コメント＞　${e(sec.comment)}</div>` : ''}
-          </div>
-        </div>`;
+        html += `<div class="print-page">${pageHeader()}${photoBlock(type, sec, loc)}</div>`;
       });
   });
 
